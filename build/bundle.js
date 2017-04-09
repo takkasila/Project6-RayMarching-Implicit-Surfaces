@@ -96,16 +96,10 @@
 	    controls.zoomSpeed = 1.0;
 	    controls.panSpeed = 2.0;
 	
-	    window.addEventListener('resize', function () {
-	        camera.aspect = window.innerWidth / window.innerHeight;
-	        camera.updateProjectionMatrix();
-	        renderer.setSize(window.innerWidth, window.innerHeight);
-	    });
-	
 	    var gui = new _datGui2.default.GUI();
 	
 	    var options = {
-	        strategy: 'Proxy Geometry'
+	        strategy: 'Ray Marching'
 	    };
 	
 	    gui.add(options, 'strategy', ['Proxy Geometry', 'Ray Marching']);
@@ -127,17 +121,25 @@
 	    proxyGeometry.add(coneMesh);
 	
 	    scene.add(proxyGeometry.group);
-	
 	    camera.position.set(5, 10, 15);
 	    camera.lookAt(new THREE.Vector3(0, 0, 0));
-	    controls.target.set(0, 0, 0);
+	    // camera.position.set(0, 0, 5);
 	
-	    var rayMarcher = new _rayMarching2.default(renderer, scene, camera);
+	    controls.target.set(0, 0, 0);
+	    var rayMarcher = new _rayMarching2.default(renderer, scene, camera, window.innerWidth, window.innerHeight);
+	
+	    window.addEventListener('resize', function () {
+	        camera.aspect = window.innerWidth / window.innerHeight;
+	        camera.updateProjectionMatrix();
+	        renderer.setSize(window.innerWidth, window.innerHeight);
+	        rayMarcher.setSize(window.innerWidth, window.innerHeight);
+	    });
 	
 	    (function tick() {
 	        controls.update();
 	        stats.begin();
 	        proxyGeometry.update();
+	        rayMarcher.update(camera);
 	        if (options.strategy === 'Proxy Geometry') {
 	            renderer.render(scene, camera);
 	        } else if (options.strategy === 'Ray Marching') {
@@ -47995,41 +47997,97 @@
 	Object.defineProperty(exports, "__esModule", {
 	    value: true
 	});
-	exports.default = RayMarcher;
+	
+	var _createClass = function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; }();
 	
 	var _proxy_geometry = __webpack_require__(5);
+	
+	function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
 	
 	var THREE = __webpack_require__(6);
 	var EffectComposer = __webpack_require__(8)(THREE);
 	
-	function RayMarcher(renderer, scene, camera) {
-	    var composer = new EffectComposer(renderer);
-	    var shaderPass = new EffectComposer.ShaderPass({
-	        uniforms: {
-	            u_buffer: {
-	                type: '4fv',
-	                value: undefined
+	// change to class
+	var RayMarcher = function () {
+	    function RayMarcher(renderer, scene, camera, width, height) {
+	        _classCallCheck(this, RayMarcher);
+	
+	        this.composer = new EffectComposer(renderer);
+	        this.shaderPass = new EffectComposer.ShaderPass({
+	            uniforms: {
+	                u_buffer: {
+	                    type: '4fv',
+	                    value: undefined
+	                },
+	                u_count: {
+	                    type: 'i',
+	                    value: 0
+	                },
+	                u_cam_pos: {
+	                    type: '3fv',
+	                    value: camera.position
+	                },
+	                u_cam_up: {
+	                    type: '3fv',
+	                    value: new THREE.Vector3(0, 1, 0)
+	                },
+	                u_cam_lookAt: {
+	                    type: '3fv',
+	                    value: new THREE.Vector3(0, 0, 0)
+	                },
+	                u_cam_vfov: {
+	                    type: 'f',
+	                    value: camera.fov
+	                },
+	                u_cam_near: {
+	                    type: 'f',
+	                    value: camera.near
+	                },
+	                u_cam_far: {
+	                    type: 'f',
+	                    value: camera.far
+	                },
+	                u_screen_width: {
+	                    type: 'f',
+	                    value: width
+	                },
+	                u_screen_height: {
+	                    type: 'f',
+	                    value: height
+	                }
 	            },
-	            u_count: {
-	                type: 'i',
-	                value: 0
-	            }
-	        },
-	        vertexShader: __webpack_require__(14),
-	        fragmentShader: __webpack_require__(15)
-	    });
-	    shaderPass.renderToScreen = true;
-	    composer.addPass(shaderPass);
+	            vertexShader: __webpack_require__(14),
+	            fragmentShader: __webpack_require__(15)
+	        });
+	        this.shaderPass.renderToScreen = true;
+	        this.composer.addPass(this.shaderPass);
+	    }
 	
-	    return {
-	        render: function render(buffer) {
-	            shaderPass.material.uniforms.u_buffer.value = buffer;
-	            shaderPass.material.uniforms.u_count.value = buffer.length / _proxy_geometry.PROXY_BUFFER_SIZE;
-	
-	            composer.render();
+	    _createClass(RayMarcher, [{
+	        key: 'render',
+	        value: function render(buffer) {
+	            this.shaderPass.material.uniforms.u_buffer.value = buffer;
+	            this.shaderPass.material.uniforms.u_count.value = buffer.length / _proxy_geometry.PROXY_BUFFER_SIZE;
+	            this.composer.render();
 	        }
-	    };
-	}
+	    }, {
+	        key: 'setSize',
+	        value: function setSize(width, height) {
+	            this.shaderPass.material.uniforms.u_screen_width.value = width;
+	            this.shaderPass.material.uniforms.u_screen_height.value = height;
+	        }
+	    }, {
+	        key: 'update',
+	        value: function update(camera) {
+	            this.shaderPass.material.uniforms.u_cam_pos.value = camera.position;
+	        }
+	    }]);
+	
+	    return RayMarcher;
+	}();
+	
+	exports.default = RayMarcher;
+	;
 
 /***/ },
 /* 8 */
@@ -48460,7 +48518,7 @@
 /* 15 */
 /***/ function(module, exports) {
 
-	module.exports = "\r\n#define MAX_GEOMETRY_COUNT 100\r\n\r\n/* This is how I'm packing the data\r\nstruct geometry_t {\r\n    vec3 position;\r\n    float type;\r\n};\r\n*/\r\nuniform vec4 u_buffer[MAX_GEOMETRY_COUNT];\r\nuniform int u_count;\r\n\r\nvarying vec2 f_uv;\r\n\r\nvoid main() {\r\n    float t;\r\n    for (int i = 0; i < MAX_GEOMETRY_COUNT; ++i) {\r\n        if (i >= u_count) {\r\n            break;\r\n        }\r\n    }\r\n\r\n    gl_FragColor = vec4(f_uv, 0, 1);\r\n}"
+	module.exports = "\r\n#define MAX_GEOMETRY_COUNT 100\r\n#define MAX_MARCHING_STEPS 50\r\n/* This is how I'm packing the data\r\nstruct geometry_t {\r\n    vec3 position;\r\n    float type;\r\n};\r\n*/\r\nuniform vec4 u_buffer[MAX_GEOMETRY_COUNT];\r\nuniform int u_count;\r\n\r\nuniform vec3 u_cam_pos;\r\nuniform vec3 u_cam_up;\r\nuniform vec3 u_cam_lookAt;\r\nuniform float u_cam_vfov;\r\nuniform float u_cam_near;\r\nuniform float u_cam_far;\r\n\r\nuniform float u_screen_width;\r\nuniform float u_screen_height;\r\n\r\nvarying vec2 f_uv;\r\n\r\nstruct Ray {\r\n    vec3 start;\r\n    vec3 dir;\r\n    float depth;\r\n};\r\n\r\nfloat sdSphere(vec3 p, float r)\r\n{\r\n    return abs(length(p) - r);\r\n}\r\n\r\nfloat sdTorus(vec3 p, vec2 t)\r\n{\r\n    vec2 q = vec2(length(p.xz)-t.x,p.y);\r\n    return length(q)-t.y;\r\n}\r\n\r\nfloat sceneSDF(vec3 p)\r\n{\r\n    // return sdSphere(p, 1.0);\r\n    return sdTorus(p, vec2(1.0, 0.5));\r\n    // return length(p) - 1.0;\r\n}\r\n\r\nbool marching(Ray ray)\r\n{\r\n    for(int i = 0; i < MAX_MARCHING_STEPS; i++)\r\n    {\r\n        float dist = sceneSDF(ray.start + ray.dir * ray.depth);\r\n        if (dist < 0.000001){\r\n            // gl_FragColor = vec4(vec3(1), 1);\r\n            return true;\r\n        }\r\n\r\n        ray.depth += dist;\r\n\r\n        if(ray.depth >= u_cam_far)\r\n        {\r\n            // gl_FragColor = vec4(1.0, 0, 0, 0);\r\n            return false;\r\n        }\r\n    }\r\n    return false;\r\n}\r\n\r\nvoid main() {\r\n\r\n    // Creat camera plane\r\n    vec3 view_n = normalize(u_cam_pos - u_cam_lookAt);\r\n    vec3 view_u = normalize(cross(u_cam_up, view_n));\r\n    vec3 view_v = normalize(cross(view_n, view_u));\r\n\r\n    vec3 plane_btm = 2.0 * view_v * u_cam_near * tan(u_cam_vfov/2.0);\r\n    vec3 plane_left = - view_u * (u_screen_width/u_screen_height) * length(plane_btm);\r\n    vec3 plane_btmLeft = u_cam_pos - view_n * u_cam_near + plane_btm + plane_left;\r\n\r\n    vec3 view_u_full = view_u * 2.0 * length(plane_left);\r\n    vec3 view_v_full = view_v * 2.0 * length(plane_btm);\r\n\r\n    // Mapping screen uv to camera plane\r\n    Ray ray;\r\n    ray.start = plane_btmLeft + f_uv.x * view_u_full + f_uv.y * view_v_full;\r\n    ray.dir = normalize(ray.start - u_cam_pos);\r\n    ray.depth = 0.0;\r\n    // vec3 ray_start = plane_btmLeft + f_uv.x * view_u_full + f_uv.y * view_v_full;\r\n    // vec3 ray_dir = normalize(ray_start - u_cam_pos);\r\n    // float ray_depth = 0.0;\r\n    \r\n    if (marching(ray))\r\n    {\r\n        gl_FragColor = vec4(1, 0, 0, 1);\r\n    }\r\n    else\r\n    {\r\n        gl_FragColor = vec4(f_uv, 0, 1);\r\n    }\r\n    // for (int i = 0; i < MAX_GEOMETRY_COUNT; ++i) {\r\n    //     if (i >= u_count) {\r\n    //         break;\r\n    //     }\r\n    // }\r\n}"
 
 /***/ },
 /* 16 */

@@ -35,16 +35,10 @@ window.addEventListener('load', function() {
     controls.zoomSpeed = 1.0;
     controls.panSpeed = 2.0;
 
-    window.addEventListener('resize', function() {
-        camera.aspect = window.innerWidth / window.innerHeight;
-        camera.updateProjectionMatrix();
-        renderer.setSize(window.innerWidth, window.innerHeight);
-    });
-
     var gui = new DAT.GUI();
 
     var options = {
-        strategy: 'Proxy Geometry'
+        strategy: 'Ray Marching'
     }
 
     gui.add(options, 'strategy', ['Proxy Geometry', 'Ray Marching']);
@@ -66,17 +60,25 @@ window.addEventListener('load', function() {
     proxyGeometry.add(coneMesh);
 
     scene.add(proxyGeometry.group);
-
     camera.position.set(5, 10, 15);
     camera.lookAt(new THREE.Vector3(0,0,0));
-    controls.target.set(0,0,0);
+    // camera.position.set(0, 0, 5);
     
-    var rayMarcher = new RayMarcher(renderer, scene, camera);
+    controls.target.set(0,0,0);
+    var rayMarcher = new RayMarcher(renderer, scene, camera, window.innerWidth, window.innerHeight);
+
+    window.addEventListener('resize', function() {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        rayMarcher.setSize(window.innerWidth, window.innerHeight);
+    });
 
     (function tick() {
         controls.update();
         stats.begin();
         proxyGeometry.update();
+        rayMarcher.update(camera);
         if (options.strategy === 'Proxy Geometry') {
             renderer.render(scene, camera);
         } else if (options.strategy === 'Ray Marching') {
