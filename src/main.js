@@ -60,9 +60,8 @@ window.addEventListener('load', function() {
     proxyGeometry.add(coneMesh);
 
     scene.add(proxyGeometry.group);
-    camera.position.set(5, 10, 15);
+    camera.position.set(0, 0, 5);
     camera.lookAt(new THREE.Vector3(0,0,0));
-    // camera.position.set(0, 0, 5);
     
     controls.target.set(0,0,0);
     var rayMarcher = new RayMarcher(renderer, scene, camera, window.innerWidth, window.innerHeight);
